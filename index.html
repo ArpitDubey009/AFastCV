@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AFastCV - Resume Builder</title>
+    <link rel="icon" type="image/png" href="/AFastcv logo.png">
+  <!-- For broader support, add ICO version too -->
+  <link rel="shortcut icon" href="/AFastcv Logo.png.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500;700&family=Playfair+Display:italic,wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Space Grotesk', sans-serif;
+            background: radial-gradient(circle at top right, #f8fafc, #e2e8f0);
+            min-height: 100vh;
+        }
+        #pdf-content { width: 210mm; min-height: 297mm; background: white; }
+        .section-title { letter-spacing: 0.2em; font-weight: 900; text-transform: uppercase; font-size: 11px; margin-bottom: 1rem; }
+        .input-group { transition: all 0.2s ease; }
+        .input-group:hover { transform: translateX(4px); }
+        #sidebar::-webkit-scrollbar { width: 5px; }
+        #sidebar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        
+        #profile-preview-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .upload-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+            cursor: pointer;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+        }
+        #profile-frame:hover .upload-overlay {
+            opacity: 1;
+        }
+
+        /* Resume Header Gradient */
+        .resume-header {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+        }
+
+        /* Dark Mode Adjustments */
+        .dark-mode-bg {
+            background: radial-gradient(circle at top right, #0f172a, #020617) !important;
+        }
+    </style>
+</head>
+<body class="transition-colors duration-300" id="body-root">
+    
+    <nav class="p-6 flex justify-between items-center max-w-7xl mx-auto sticky top-0 z-50 bg-white/80 backdrop-blur-md rounded-b-2xl shadow-sm border-x border-b border-slate-100">
+        <h2 class="text-2xl font-black tracking-tighter">AFAST<span id="logo-dot" class="text-blue-600">CV.</span></h2>
+        <div class="flex gap-4 items-center">
+            <button onclick="toggleDarkMode()" class="p-2 text-xl hover:bg-slate-200 rounded-full transition" id="theme-toggle">🌙</button>
+            <button onclick="downloadPDF()" id="download-btn" class="bg-blue-600 text-white px-8 py-2.5 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-3">
+                <span id="btn-text">Download PDF</span>
+                <div id="btn-spinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            </button>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto p-4 lg:p-10 flex flex-col lg:flex-row gap-8 items-start justify-center">
+        
+        <!-- Editor Sidebar -->
+        <div class="w-full lg:w-[500px] p-6 rounded-3xl shadow-2xl space-y-8 bg-white border border-slate-100 overflow-y-auto max-h-[85vh] sticky top-24" id="sidebar">
+            <div class="flex bg-slate-100 p-1 rounded-2xl">
+                <button onclick="switchView('resume')" id="tab-resume" class="flex-1 py-2 text-xs font-bold rounded-xl transition bg-white shadow-md text-slate-900">RESUME</button>
+                <button onclick="switchView('letter')" id="tab-letter" class="flex-1 py-2 text-xs font-bold rounded-xl transition text-slate-400">COVER LETTER</button>
+            </div>
+
+            <div class="space-y-8">
+                <!-- Profile & Theme -->
+                <section class="space-y-4">
+                    <label class="text-[10px] font-bold uppercase text-slate-400">Appearance</label>
+                    <div class="flex items-center gap-3">
+                        <button onclick="setTheme('blue')" class="w-8 h-8 rounded-full bg-blue-600 ring-2 ring-offset-2 ring-blue-600"></button>
+                        <button onclick="setTheme('red')" class="w-8 h-8 rounded-full bg-red-600"></button>
+                        <button onclick="setTheme('emerald')" class="w-8 h-8 rounded-full bg-emerald-600"></button>
+                        <button onclick="setTheme('slate')" class="w-8 h-8 rounded-full bg-slate-800"></button>
+                    </div>
+
+                    <div class="space-y-3">
+                        <label class="text-[10px] font-bold uppercase text-slate-400">Personal Details</label>
+                        <input type="text" oninput="updateField('name', this.value)" placeholder="Full Name" class="w-full p-3 rounded-xl border bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none" value="Arpit Dubey">
+                        <input type="text" oninput="updateField('role', this.value)" placeholder="Professional Title (e.g. Software Engineer)" class="w-full p-3 rounded-xl border bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none" value="Full Stack Engineer">
+                        
+                        <div class="grid grid-cols-1 gap-3">
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 ml-1">Email Address</label>
+                                <input type="email" oninput="updateContact()" id="input-email" placeholder="alex@example.com" class="w-full p-3 rounded-xl border bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none" value="arpit391999@gmail.com">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 ml-1">Phone Number</label>
+                                <input type="text" oninput="updateContact()" id="input-phone" placeholder="+1 234 567 890" class="w-full p-3 rounded-xl border bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none" value="91-7838215474">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold text-slate-400 ml-1">Location / LinkedIn</label>
+                                <input type="text" oninput="updateContact()" id="input-location" placeholder="City, Country" class="w-full p-3 rounded-xl border bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none" value="New Delhi, india">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-[10px] font-bold uppercase text-slate-400">Professional Bio</label>
+                            <textarea oninput="updateField('bio', this.value)" placeholder="Write a short professional summary..." class="w-full p-3 rounded-xl border bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none">Innovative Full Stack Engineer with 5+ years of experience building scalable web applications. Passionate about clean code and user-centric design.</textarea>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-blue-50 border border-blue-100 rounded-2xl">
+                        <p class="text-[10px] font-bold text-blue-600 uppercase mb-2">Profile Photo</p>
+                        <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+                        <button onclick="document.getElementById('image-upload').click()" class="w-full py-2 bg-white border border-blue-200 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-100 transition">
+                            Upload New Photo
+                        </button>
+                    </div>
+                </section>
+
+                <!-- Experience -->
+                <section class="space-y-3 border-t pt-6">
+                    <div class="flex justify-between items-center">
+                        <label class="text-[10px] font-bold uppercase text-slate-400">Experience</label>
+                        <button onclick="addItem('experience')" class="text-blue-600 text-xs font-bold">+ Add</button>
+                    </div>
+                    <div id="form-experience" class="space-y-4"></div>
+                </section>
+
+                <!-- Education -->
+                <section class="space-y-3 border-t pt-6">
+                    <div class="flex justify-between items-center">
+                        <label class="text-[10px] font-bold uppercase text-slate-400">Education</label>
+                        <button onclick="addItem('education')" class="text-blue-600 text-xs font-bold">+ Add</button>
+                    </div>
+                    <div id="form-education" class="space-y-4"></div>
+                </section>
+
+                <!-- Skills & Languages -->
+                <section class="space-y-4 border-t pt-6">
+                    <label class="text-[10px] font-bold uppercase text-slate-400">Skills (Comma separated)</label>
+                    <input type="text" oninput="updateSkills(this.value)" value="React, Node.js, AWS, Python" class="w-full p-3 rounded-xl border bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                    
+                    <label class="text-[10px] font-bold uppercase text-slate-400">Languages</label>
+                    <input type="text" oninput="updateField('languages', this.value)" value="English (Native), German (B2)" class="w-full p-3 rounded-xl border bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none">
+                </section>
+            </div>
+        </div>
+
+        <!-- Preview Canvas -->
+        <div class="flex-1 flex justify-center bg-slate-300/30 p-4 lg:p-12 rounded-[40px] shadow-inner overflow-hidden">
+            <div id="canvas-wrapper" class="bg-white shadow-2xl origin-top transition-transform duration-500 scale-[0.35] sm:scale-[0.5] lg:scale-[0.8] xl:scale-[1.0]">
+                <div id="pdf-content" class="text-slate-800 relative">
+                    <!-- Header with Gradient Background -->
+                    <div class="resume-header p-16 pb-10 flex items-center gap-10 border-b-2 border-slate-50">
+                        <div id="profile-frame" onclick="document.getElementById('image-upload').click()" class="relative w-32 h-32 rounded-3xl overflow-hidden border-4 border-blue-600 rotate-2 shadow-xl shrink-0 bg-white flex items-center justify-center text-slate-300 font-bold">
+                            <span id="photo-placeholder">PHOTO</span>
+                            <img id="profile-preview-img" class="hidden" alt="Profile">
+                            <div class="upload-overlay">CLICK TO UPLOAD</div>
+                        </div>
+                        <div class="flex-1">
+                            <h1 id="view-name" class="text-5xl font-black uppercase text-slate-900 tracking-tighter leading-none">Arpit Dubey</h1>
+                            <p id="view-role" class="text-xl font-bold text-blue-600 uppercase tracking-widest mt-2">Full Stack Engineer</p>
+                            <div id="view-contact-container" class="text-[11px] text-slate-400 mt-3 font-medium flex flex-wrap gap-x-3 gap-y-1">
+                                <span id="view-email">arpit391999@gmail.com</span>
+                                <span class="opacity-30">•</span>
+                                <span id="view-phone">91-7838215474</span>
+                                <span class="opacity-30">•</span>
+                                <span id="view-location">New Delhi, Inda</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-16 pt-10">
+                        <!-- Bio Section (Full Width) -->
+                        <div class="mb-10">
+                            <h3 class="section-title text-slate-300">Profile Summary</h3>
+                            <p id="view-bio" class="text-sm leading-relaxed text-slate-600 italic">Innovative Full Stack Engineer with 5+ years of experience building scalable web applications. Passionate about clean code and user-centric design.</p>
+                        </div>
+
+                        <!-- Layout Grid -->
+                        <div id="resume-content" class="grid grid-cols-12 gap-12">
+                            <!-- Sidebar Area -->
+                            <div class="col-span-4 space-y-10">
+                                <section>
+                                    <h3 class="section-title text-blue-600 theme-text">Skills</h3>
+                                    <div id="view-skills" class="flex flex-wrap gap-2"></div>
+                                </section>
+                                <section>
+                                    <h3 class="section-title text-blue-600 theme-text">Languages</h3>
+                                    <p id="view-languages" class="text-xs text-slate-600 font-medium">English (Native), German (B2)</p>
+                                </section>
+                            </div>
+
+                            <!-- Main Area -->
+                            <div class="col-span-8 space-y-10 border-l-2 pl-12 border-slate-50">
+                                <section>
+                                    <h3 class="section-title text-slate-300">Experience</h3>
+                                    <div id="view-experience" class="space-y-6"></div>
+                                </section>
+                                <section>
+                                    <h3 class="section-title text-slate-300">Education</h3>
+                                    <div id="view-education" class="space-y-4"></div>
+                                </section>
+                            </div>
+                        </div>
+
+                        <div id="letter-content" class="hidden leading-relaxed text-slate-700 whitespace-pre-line text-base pt-4">
+                            <div class="mb-12 text-xs font-bold uppercase tracking-widest text-slate-300 border-b pb-4">Subject: Cover Letter</div>
+                            <p id="letter-body" class="text-sm leading-[1.8] text-slate-600 font-serif">Dear Hiring Manager, I am writing to express my interest...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const data = {
+            experience: [{ id: 1, title: 'Senior Developer', org: 'Tech Corp', date: '2022-Present', desc: '' }],
+            education: [{ id: 1, title: 'Computer Science', org: 'MIT', date: '2020', desc: '' }],
+            skills: ['React', 'Node.js', 'AWS', 'Python']
+        };
+
+        const themes = {
+            blue: { main: '#2563eb', light: '#eff6ff', text: 'text-blue-600', bg: 'bg-blue-600' },
+            red: { main: '#dc2626', light: '#fef2f2', text: 'text-red-600', bg: 'bg-red-600' },
+            emerald: { main: '#059669', light: '#ecfdf5', text: 'text-emerald-600', bg: 'bg-emerald-600' },
+            slate: { main: '#1e293b', light: '#f1f5f9', text: 'text-slate-800', bg: 'bg-slate-800' }
+        };
+
+        let currentTheme = 'blue';
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imgElement = document.getElementById('profile-preview-img');
+                const placeholder = document.getElementById('photo-placeholder');
+                imgElement.src = e.target.result;
+                imgElement.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function switchView(view) {
+            document.getElementById('resume-content').classList.toggle('hidden', view !== 'resume');
+            document.getElementById('letter-content').classList.toggle('hidden', view !== 'letter');
+            document.getElementById('tab-resume').className = view === 'resume' ? 'flex-1 py-2 text-xs font-bold rounded-xl transition bg-white shadow-md text-slate-900' : 'flex-1 py-2 text-xs font-bold rounded-xl transition text-slate-400';
+            document.getElementById('tab-letter').className = view === 'letter' ? 'flex-1 py-2 text-xs font-bold rounded-xl transition bg-white shadow-md text-slate-900' : 'flex-1 py-2 text-xs font-bold rounded-xl transition text-slate-400';
+        }
+
+        function setTheme(color) {
+            currentTheme = color;
+            const theme = themes[color];
+            document.getElementById('logo-dot').className = theme.text;
+            document.getElementById('download-btn').className = `${theme.bg} text-white px-8 py-2.5 rounded-full font-bold shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center gap-3`;
+            document.getElementById('profile-frame').style.borderColor = theme.main;
+            document.getElementById('view-role').style.color = theme.main;
+            document.querySelectorAll('.theme-text').forEach(el => el.style.color = theme.main);
+            updateSkillsUI();
+            updateAllSections();
+        }
+
+        function updateField(id, val) {
+            const el = document.getElementById('view-' + id);
+            if (el) el.innerText = val;
+        }
+
+        function updateContact() {
+            const email = document.getElementById('input-email').value;
+            const phone = document.getElementById('input-phone').value;
+            const loc = document.getElementById('input-location').value;
+
+            document.getElementById('view-email').innerText = email;
+            document.getElementById('view-phone').innerText = phone;
+            document.getElementById('view-location').innerText = loc;
+        }
+
+        function updateSkills(val) {
+            data.skills = val.split(',').map(s => s.trim()).filter(s => s !== '');
+            updateSkillsUI();
+        }
+
+        function updateSkillsUI() {
+            const container = document.getElementById('view-skills');
+            const theme = themes[currentTheme];
+            container.innerHTML = data.skills.map(s => `
+                <span class="${theme.light} ${theme.text} px-2.5 py-1 rounded-lg text-[10px] font-bold border border-current/10">${s}</span>
+            `).join('');
+        }
+
+        function addItem(type) {
+            const newItem = { id: Date.now(), title: '', org: '', date: '', desc: '' };
+            data[type].push(newItem);
+            renderForm(type);
+            updateSectionUI(type);
+        }
+
+        function removeItem(type, id) {
+            data[type] = data[type].filter(item => item.id !== id);
+            renderForm(type);
+            updateSectionUI(type);
+        }
+
+        function updateItem(type, id, field, val) {
+            const item = data[type].find(i => i.id === id);
+            if (item) item[field] = val;
+            updateSectionUI(type);
+        }
+
+        function renderForm(type) {
+            const container = document.getElementById('form-' + type);
+            container.innerHTML = data[type].map(item => `
+                <div class="p-3 bg-slate-50 border rounded-xl space-y-2 relative group input-group">
+                    <button onclick="removeItem('${type}', ${item.id})" class="absolute -right-2 -top-2 bg-red-100 text-red-600 rounded-full w-5 h-5 text-[10px] opacity-0 group-hover:opacity-100 transition">×</button>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input placeholder="Title/Degree" oninput="updateItem('${type}', ${item.id}, 'title', this.value)" value="${item.title}" class="text-xs p-1.5 border rounded-lg bg-white">
+                        <input placeholder="Year/Date" oninput="updateItem('${type}', ${item.id}, 'date', this.value)" value="${item.date}" class="text-xs p-1.5 border rounded-lg bg-white">
+                    </div>
+                    <input placeholder="Company/School" oninput="updateItem('${type}', ${item.id}, 'org', this.value)" value="${item.org}" class="w-full text-xs p-1.5 border rounded-lg bg-white">
+                </div>
+            `).join('');
+        }
+
+        function updateSectionUI(type) {
+            const container = document.getElementById('view-' + type);
+            const theme = themes[currentTheme];
+            container.innerHTML = data[type].map(item => `
+                <div class="mb-4">
+                    <div class="flex justify-between items-baseline mb-1">
+                        <p class="font-bold text-slate-900 text-sm">${item.title || 'Untitled'}</p>
+                        <p class="text-[9px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 uppercase">${item.date || 'Present'}</p>
+                    </div>
+                    <p class="text-xs font-bold ${theme.text} uppercase tracking-wide">${item.org || 'Organization'}</p>
+                </div>
+            `).join('');
+        }
+
+        function updateAllSections() {
+            ['experience', 'education'].forEach(t => {
+                renderForm(t);
+                updateSectionUI(t);
+            });
+            updateSkillsUI();
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.getElementById('body-root').classList.toggle('dark-mode-bg');
+            document.getElementById('body-root').classList.toggle('text-white', isDark);
+            document.getElementById('sidebar').classList.toggle('bg-slate-800', isDark);
+            document.getElementById('sidebar').classList.toggle('border-slate-700', isDark);
+            document.getElementById('theme-toggle').innerText = isDark ? '☀️' : '🌙';
+        }
+
+        async function downloadPDF() {
+            const btn = document.getElementById('download-btn');
+            const btnText = document.getElementById('btn-text');
+            const spinner = document.getElementById('btn-spinner');
+            
+            btn.disabled = true;
+            btnText.innerText = "Generating...";
+            spinner.classList.remove('hidden');
+
+            try {
+                const element = document.getElementById('pdf-content');
+                const canvas = await html2canvas(element, { 
+                    scale: 3, 
+                    useCORS: true, 
+                    backgroundColor: '#ffffff',
+                    allowTaint: true
+                });
+                
+                const imgData = canvas.toDataURL('image/png');
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const w = pdf.internal.pageSize.getWidth();
+                const h = (canvas.height * w) / canvas.width;
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, w, h);
+                pdf.save(`FastCV_${Date.now()}.pdf`);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                btn.disabled = false;
+                btnText.innerText = "Download PDF";
+                spinner.classList.add('hidden');
+            }
+        }
+
+        updateAllSections();
+    </script>
+</body>
+</html>
